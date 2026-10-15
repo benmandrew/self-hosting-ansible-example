@@ -52,7 +52,10 @@ log "Fetching the Debian 13 cloud image"
 # published checksum is stale rather than corrupt, and is fetched again.
 mkdir -p "$cache"
 curl -fsSL -o "$cache/SHA512SUMS" "$image_url/SHA512SUMS"
-image_ok() { (cd "$cache" && grep " $image_name\$" SHA512SUMS | sha512sum -c --quiet - 2>/dev/null); }
+image_ok() {
+	[[ -f $cache/$image_name ]] &&
+		(cd "$cache" && grep " $image_name\$" SHA512SUMS | sha512sum -c --quiet - >/dev/null 2>&1)
+}
 if ! image_ok; then
 	curl -fsSL -o "$cache/$image_name" "$image_url/$image_name"
 	image_ok || {
