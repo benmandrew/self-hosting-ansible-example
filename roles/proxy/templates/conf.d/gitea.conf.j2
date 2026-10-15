@@ -1,0 +1,31 @@
+server {
+    listen 80;
+    server_name {{ gitea_domain }};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name {{ gitea_domain }};
+
+    ssl_certificate /etc/ssl/certs/origin.pem;
+    ssl_certificate_key /etc/ssl/certs/origin.key;
+
+    # Repository pushes over HTTPS can be large.
+    client_max_body_size 512m;
+
+    # Docker's embedded DNS server. Putting the upstream in a variable makes
+    # nginx resolve it per request rather than at startup, so nginx starts, and
+    # serves the static site, whether or not the Gitea container exists yet.
+    resolver 127.0.0.11 valid=30s;
+    set $gitea_upstream http://gitea:3000;
+
+    location / {
+        proxy_pass $gitea_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

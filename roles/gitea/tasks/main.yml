@@ -1,0 +1,62 @@
+---
+- name: Create directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ deployment_home }}/gitea"
+    - "{{ deployment_home }}/gitea/data"
+    - "{{ deployment_home }}/gitea/runner"
+
+- name: Copy runner configuration
+  ansible.builtin.copy:
+    src: runner/config.yaml
+    dest: "{{ deployment_home }}/gitea/runner-config.yaml"
+    mode: "0644"
+
+# The file holds the runner registration token, so only root reads it.
+- name: Render Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ deployment_home }}/gitea/docker-compose.yml"
+    mode: "0600"
+
+# wait holds until Gitea's healthcheck passes, so the admin user can be created
+# straight after.
+- name: Deploy stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ deployment_home }}/gitea"
+    recreate: auto
+    wait: true
+    wait_timeout: 180
+
+- name: List admin users
+  ansible.builtin.command:
+    argv: [docker, exec, -u, git, gitea, gitea, admin, user, list, --admin]
+  register: gitea_admins
+  changed_when: false
+
+- name: Create the admin user
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - -u
+      - git
+      - gitea
+      - gitea
+      - admin
+      - user
+      - create
+      - --admin
+      - --username
+      - "{{ gitea_admin_user }}"
+      - --email
+      - "{{ gitea_admin_email }}"
+      - --password
+      - "{{ gitea_admin_password }}"
+      - --must-change-password=false
+  when: gitea_admin_user not in gitea_admins.stdout.split()
+  changed_when: true
+  no_log: true

@@ -1,0 +1,7 @@
+---
+# Test before reloading: a reload with a broken config fails, and nginx keeps
+# serving the last good one, so the error would otherwise go unnoticed.
+- name: Reload nginx
+  ansible.builtin.command:
+    argv: [docker, exec, nginx-proxy, sh, -c, "nginx -t && nginx -s reload"]
+  changed_when: true

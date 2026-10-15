@@ -1,0 +1,20 @@
+# Configuration for act_runner. The full reference is the output of
+# `act_runner generate-config`.
+log:
+  level: info
+
+runner:
+  # Written on first registration; it holds the runner's identity.
+  file: .runner
+  capacity: 1
+  timeout: 3h
+  # A workflow's `runs-on: ubuntu-latest` runs in this image.
+  labels:
+    - "ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest"
+
+cache:
+  enabled: true
+
+container:
+  network: ""
+  privileged: false

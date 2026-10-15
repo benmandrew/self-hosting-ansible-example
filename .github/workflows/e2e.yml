@@ -1,0 +1,33 @@
+name: e2e
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # Hosted runners have /dev/kvm, but only root can open it by default.
+      - name: Allow access to KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ansible-core==2.21.1
+      - run: ansible-galaxy collection install -r requirements.yml
+      - uses: actions/cache@v4
+        with:
+          path: tests/.cache
+          key: debian-13-cloud-image-${{ github.run_id }}
+          restore-keys: debian-13-cloud-image-
+      - run: make test

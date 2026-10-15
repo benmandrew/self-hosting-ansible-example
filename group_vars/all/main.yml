@@ -1,0 +1,28 @@
+---
+# The apex domain. The site is served at this name, www redirects to it, and
+# Gitea is served at git.<domain>.
+domain: example.com
+gitea_domain: "git.{{ domain }}"
+
+# Everything the roles deploy lives under this directory on the server.
+deployment_home: /opt/selfhost
+
+# The Docker network shared by nginx and every service it proxies to.
+proxy_network: proxy
+
+# Pin images to exact versions, so two deploys a week apart run the same thing.
+container_images:
+  nginx: nginx:1.31.3
+  gitea: docker.gitea.com/gitea:1.27.1
+  act_runner: docker.io/gitea/act_runner:0.6.1
+
+# Git over SSH. Port 22 belongs to the server's own sshd.
+gitea_ssh_port: 2222
+
+gitea_admin_user: gitea_admin
+gitea_admin_email: "admin@{{ domain }}"
+gitea_admin_password: "{{ vault_gitea_admin_password }}"
+
+# Shared by Gitea and the runner, so the runner registers itself with no manual
+# step. Gitea requires at least 32 characters.
+gitea_runner_token: "{{ vault_gitea_runner_token }}"

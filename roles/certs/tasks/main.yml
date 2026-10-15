@@ -1,0 +1,20 @@
+---
+# The two files under files/ are encrypted with Ansible Vault. The copy module
+# decrypts them on the way to the server, so they are plaintext only there.
+- name: Create the certificate directory
+  ansible.builtin.file:
+    path: "{{ deployment_home }}/certs"
+    state: directory
+    mode: "0700"
+
+- name: Copy the certificate
+  ansible.builtin.copy:
+    src: origin.pem
+    dest: "{{ deployment_home }}/certs/origin.pem"
+    mode: "0644"
+
+- name: Copy the private key
+  ansible.builtin.copy:
+    src: origin.key
+    dest: "{{ deployment_home }}/certs/origin.key"
+    mode: "0600"

@@ -1,0 +1,59 @@
+services:
+  gitea:
+    image: {{ container_images.gitea }}
+    container_name: gitea
+    restart: always
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__server__ROOT_URL=https://{{ gitea_domain }}/
+      - GITEA__server__SSH_DOMAIN={{ gitea_domain }}
+      - GITEA__server__SSH_PORT={{ gitea_ssh_port }}
+      - GITEA__database__DB_TYPE=sqlite3
+      # Skip the web installer. The admin user is created by Ansible instead,
+      # so the installer page is never left open on the public internet.
+      - GITEA__security__INSTALL_LOCK=true
+      - GITEA__service__DISABLE_REGISTRATION=true
+      - GITEA__repository__DEFAULT_PRIVATE=private
+      - GITEA_RUNNER_REGISTRATION_TOKEN={{ gitea_runner_token }}
+    volumes:
+      - {{ deployment_home }}/gitea/data:/data
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      # Git over SSH. HTTP reaches Gitea only through nginx.
+      - "{{ gitea_ssh_port }}:22"
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  runner:
+    image: {{ container_images.act_runner }}
+    container_name: gitea-runner
+    restart: always
+    depends_on:
+      gitea:
+        condition: service_healthy
+    environment:
+      - CONFIG_FILE=/config.yaml
+      # Inside the proxy network, so registration does not go out through DNS
+      # and nginx and back in.
+      - GITEA_INSTANCE_URL=http://gitea:3000
+      - GITEA_RUNNER_REGISTRATION_TOKEN={{ gitea_runner_token }}
+      - GITEA_RUNNER_NAME={{ inventory_hostname }}
+    volumes:
+      - {{ deployment_home }}/gitea/runner-config.yaml:/config.yaml:ro
+      - {{ deployment_home }}/gitea/runner:/data
+      # Jobs run as sibling containers on the host's Docker daemon. Anything a
+      # workflow does, it can do as root on this server.
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: {{ proxy_network }}

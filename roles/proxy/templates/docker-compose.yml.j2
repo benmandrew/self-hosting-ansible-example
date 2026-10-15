@@ -1,0 +1,19 @@
+services:
+  nginx:
+    image: {{ container_images.nginx }}
+    container_name: nginx-proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - {{ deployment_home }}/proxy/conf.d:/etc/nginx/conf.d:ro
+      - {{ deployment_home }}/static-site:/var/www/site:ro
+      - {{ deployment_home }}/certs:/etc/ssl/certs:ro
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: {{ proxy_network }}

@@ -1,0 +1,39 @@
+---
+- name: Create directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ deployment_home }}/proxy"
+    - "{{ deployment_home }}/proxy/conf.d"
+    - "{{ deployment_home }}/static-site"
+
+- name: Render nginx site configuration
+  ansible.builtin.template:
+    src: "conf.d/{{ item }}.j2"
+    dest: "{{ deployment_home }}/proxy/conf.d/{{ item }}"
+    mode: "0644"
+  loop:
+    - static.conf
+    - gitea.conf
+  notify: Reload nginx
+
+# A placeholder. In practice the site is built and published by CI, which
+# writes into the same directory.
+- name: Copy the static site
+  ansible.builtin.copy:
+    src: site/
+    dest: "{{ deployment_home }}/static-site/"
+    mode: "0644"
+
+- name: Render Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ deployment_home }}/proxy/docker-compose.yml"
+    mode: "0644"
+
+- name: Deploy stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ deployment_home }}/proxy"
+    recreate: auto
