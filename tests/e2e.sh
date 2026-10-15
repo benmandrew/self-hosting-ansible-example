@@ -21,7 +21,7 @@ cache=$repo/tests/.cache
 work=$(mktemp -d)
 failures=0
 
-log() { printf '\n==> %s\n' "$*"; }
+log() { printf '\n==> [%3ds] %s\n' "$SECONDS" "$*"; }
 pass() { printf '  ok    %s\n' "$1"; }
 fail() {
 	printf '  FAIL  %s: %s\n' "$1" "$2"
@@ -64,9 +64,16 @@ fi
 log "Booting the VM"
 qemu-img create -q -f qcow2 -b "$cache/$image_name" -F qcow2 "$work/disk.qcow2" 20G
 ssh-keygen -q -t ed25519 -N '' -f "$work/id" -C e2e
+# apt's HTTP pipelining stalls for about 30 s per update behind QEMU's
+# user-mode network (34-46 s against 3.4-3.8 s without it, measured on this
+# image; no stall on the host). A real server has no such problem, so this
+# removes an emulator artefact rather than changing what is tested.
 cat >"$work/user-data" <<CLOUD
 #cloud-config
 disable_root: false
+write_files:
+  - path: /etc/apt/apt.conf.d/99-no-pipelining
+    content: 'Acquire::http::Pipeline-Depth "0";'
 users:
   - name: root
     ssh_authorized_keys:
@@ -93,9 +100,9 @@ ssh_opts=(-q -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=
 # shellcheck disable=SC2029 # the command is meant to expand locally
 vm() { ssh "${ssh_opts[@]}" root@127.0.0.1 "$@"; }
 
-for _ in $(seq 60); do
+for _ in $(seq 180); do
 	vm 'cloud-init status --wait >/dev/null' 2>/dev/null && break
-	sleep 3
+	sleep 1
 done
 vm true || {
 	tail -30 "$work/console.log"
@@ -148,7 +155,10 @@ expect "HTTP redirects to HTTPS" "301 https://$domain/" \
 expect "Gitea answers through nginx" 200 \
 	"$(get -o /dev/null -w '%{http_code}' "https://$git_domain:$https_port/api/v1/version")"
 
-if get "https://$git_domain:$https_port/user/sign_up" | grep -q 'Registration is disabled'; then
+# Captured first: grep -q exits at the first match, and under pipefail the
+# SIGPIPE that kills curl mid-page would fail the check.
+signup=$(get "https://$git_domain:$https_port/user/sign_up")
+if grep -q 'Registration is disabled' <<<"$signup"; then
 	pass "public registration is disabled"
 else
 	fail "public registration is disabled" "sign-up page does not say so"
@@ -166,20 +176,21 @@ expect "admin can log in" 200 "$(api -o /dev/null -w '%{http_code}' "$api_url/us
 
 log "Running a CI job on the runner"
 # No actions/checkout: the job container would clone from the public URL,
-# which does not resolve inside the VM.
+# which does not resolve inside the VM. The job runs in Alpine rather than the
+# label's 589 MB runner image, which is most of what the VM would download.
 api -X POST "$api_url/user/repos" -d '{"name":"e2e","auto_init":true}' -o /dev/null
-workflow=$(printf 'on: [push]\njobs:\n  hello:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hello\n' | base64 -w0)
+workflow=$(printf 'on: [push]\njobs:\n  hello:\n    runs-on: ubuntu-latest\n    container: alpine:3.24.2\n    steps:\n      - run: echo hello\n' | base64 -w0)
 api -X POST "$api_url/repos/$admin/e2e/contents/.gitea/workflows/ci.yml" \
 	-d "{\"content\":\"$workflow\",\"message\":\"Add CI\"}" -o /dev/null
 
 status=none
-for _ in $(seq 100); do
+for _ in $(seq 300); do
 	status=$(api "$api_url/repos/$admin/e2e/actions/runs" | python3 -c '
 import json, sys
 runs = json.load(sys.stdin).get("workflow_runs") or []
 print(runs[0]["status"], runs[0].get("conclusion")) if runs else print("none")')
 	[[ $status == completed* ]] && break
-	sleep 6
+	sleep 2
 done
 expect "CI job succeeds" "completed success" "$status"
 

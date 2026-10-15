@@ -57,7 +57,7 @@ ansible-playbook playbooks/site.yml --tags proxy
 - git over SSH answers with a banner, and the admin user can log in;
 - a CI job pushed to a new repository completes successfully on the runner.
 
-It needs `qemu-system-x86_64`, `qemu-img`, `genisoimage` and access to `/dev/kvm`. `KEEP_VM=1 make test` leaves the VM running afterwards. A full local run of `make test` took about 4 minutes. The same test runs in GitHub Actions through `.github/workflows/e2e.yml`, and `.github/workflows/lint.yml` runs the lint.
+It needs `qemu-system-x86_64`, `qemu-img`, `genisoimage` and access to `/dev/kvm`. `KEEP_VM=1 make test` leaves the VM running afterwards. A full local run of `make test` took 129 seconds, most of it downloading packages and images onto the fresh VM. The same test runs in GitHub Actions through `.github/workflows/e2e.yml`, and `.github/workflows/lint.yml` runs the lint.
 
 ## What is left out
 

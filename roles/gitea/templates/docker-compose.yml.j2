@@ -26,9 +26,13 @@ services:
       - proxy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthz"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
-      retries: 12
+      retries: 3
+      # Checked every 2 s while starting, so the deploy goes on as soon as
+      # Gitea is up rather than at the first 30 s tick.
+      start_period: 120s
+      start_interval: 2s
 
   runner:
     image: {{ container_images.act_runner }}

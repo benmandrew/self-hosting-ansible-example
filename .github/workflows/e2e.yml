@@ -25,9 +25,18 @@ jobs:
           python-version: "3.13"
       - run: pip install ansible-core==2.21.1
       - run: ansible-galaxy collection install -r requirements.yml
+      # Keyed on the published checksum, so the 341 MB image is saved once per
+      # Debian release rather than once per run. No restore-keys: an older
+      # image fails the test's checksum and is downloaded again anyway.
+      - name: Look up the cloud image checksum
+        id: image
+        run: |
+          sha=$(curl -fsSL https://cloud.debian.org/images/cloud/trixie/latest/SHA512SUMS |
+            awk '$2 == "debian-13-genericcloud-amd64.qcow2" { print $1 }')
+          test -n "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
         with:
           path: tests/.cache
-          key: debian-13-cloud-image-${{ github.run_id }}
-          restore-keys: debian-13-cloud-image-
+          key: debian-13-cloud-image-${{ steps.image.outputs.sha }}
       - run: make test
