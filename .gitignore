@@ -1,3 +1,7 @@
 vault-pass.txt
 .ansible/
 tests/.cache/
+# Written by scripts/bootstrap.sh. Delete these two lines in your own copy so
+# the encrypted secrets are committed.
+group_vars/all/vault.yml
+roles/certs/files/

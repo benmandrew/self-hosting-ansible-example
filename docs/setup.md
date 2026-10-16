@@ -26,7 +26,7 @@ The self-signed certificate is a placeholder. Replace `roles/certs/files/origin.
 ansible-vault encrypt roles/certs/files/origin.*
 ```
 
-Commit the encrypted certificate and `vault.yml` in your own copy.
+This repository gitignores the certificate and `vault.yml`, so its own test secrets never reach it. In your own copy, delete those two lines from `.gitignore` and commit the encrypted files.
 
 ## vault-pass.txt
 
